@@ -169,15 +169,12 @@ class ChatbotAntigravity:
         )
         # Urutan percobaan: versi API bawaan lalu v1beta; untuk tiap versi: model dari Secrets,
         # lalu model Flash yang benar-benar tersedia untuk API key ini.
-        if getattr(self, "_rute_ok", None):
-            rute = [self._rute_ok]
-        else:
-            rute = []
+        rute = [self._rute_ok] if getattr(self, "_rute_ok", None) else []
         dicoba, error = [], None
         for versi in (None, "v1beta"):
             nama_list = [self.model]
             try:
-                nama_list += [m for m in self._model_tersedia(versi) if m != self.model][:4]
+                nama_list += [m for m in self._model_tersedia(versi) if m != self.model][:6]
             except Exception as e:
                 dicoba.append(f"list({versi or 'default'}): {str(e)[:80]}")
             rute += [(versi, n) for n in nama_list]
@@ -197,7 +194,10 @@ class ChatbotAntigravity:
                 error = e
                 dicoba.append(f"{nama}@{versi or 'default'}: {str(e)[:60]}")
                 pesan = str(e).lower()
-                if not any(k in pesan for k in ("not found", "404", "not supported")):
+                # Lanjut ke model berikutnya jika model tidak ada ATAU sedang sibuk/kuota habis
+                if not any(k in pesan for k in ("not found", "404", "not supported", "503", "unavailable",
+                                                "overloaded", "high demand", "429", "resource_exhausted",
+                                                "quota")):
                     break
         raise RuntimeError("Gemini gagal. Percobaan → " + " | ".join(dicoba)) from error
 
