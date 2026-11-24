@@ -6,7 +6,7 @@ Jalankan lokal :  streamlit run app.py
 Secrets (Streamlit Cloud > Settings > Secrets, atau .streamlit/secrets.toml):
     DATABASE_URL   = "postgresql://..."      # Supabase / Neon
     GEMINI_API_KEY = "AIza..."               # opsional, dari aistudio.google.com
-    GEMINI_MODEL   = "gemini-2.5-flash"      # opsional
+    GEMINI_MODEL   = "gemini-flash-latest"   # opsional
     ADMIN_PASSWORD = "ganti-password"        # untuk halaman Dashboard
 """
 
@@ -22,6 +22,9 @@ import db
 from engine import ChatbotAntigravity
 from knowledge_base import CONTOH_PERTANYAAN, DATA_UJI, DOKUMEN, INFO_MATERI
 
+NAMA_MAHASISWA = "RENXY LICHANDY"
+IDENTITAS = "Mahasiswa | 261012000110"
+
 st.set_page_config(page_title="AntiGravBot · Google Antigravity 2.0", page_icon="🚀", layout="wide")
 
 st.markdown("""
@@ -30,6 +33,8 @@ st.markdown("""
        background:linear-gradient(120deg,#0b1f3a 0%,#123f73 55%,#1b6fb3 100%);color:#fff;}
 .hero h2 {margin:0;color:#fff;font-size:1.55rem}
 .hero p {margin:.35rem 0 0;opacity:.85}
+.author {margin-top:.7rem;padding-top:.6rem;border-top:1px solid rgba(255,255,255,.25);font-size:.9rem}
+.author b {letter-spacing:.04em}
 .badge {display:inline-block;padding:2px 9px;border-radius:99px;font-size:.75rem;margin-right:6px;
         background:#e8f1fb;color:#123f73;border:1px solid #c5dcf3}
 </style>""", unsafe_allow_html=True)
@@ -47,7 +52,7 @@ def rahasia(kunci, default=None):
 
 DATABASE_URL = rahasia("DATABASE_URL")
 GEMINI_API_KEY = rahasia("GEMINI_API_KEY")
-GEMINI_MODEL = rahasia("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = rahasia("GEMINI_MODEL", "gemini-flash-latest")
 ADMIN_PASSWORD = rahasia("ADMIN_PASSWORD", "admin123")
 
 
@@ -99,6 +104,7 @@ if "session_id" not in st.session_state:
 # ------------------------------------------------------------------- sidebar
 with st.sidebar:
     st.markdown("## 🚀 AntiGravBot")
+    st.markdown(f"**{NAMA_MAHASISWA}**  \n{IDENTITAS}")
     halaman = st.radio("Menu", ["💬 Chatbot", "📚 Materi", "📊 Dashboard", "ℹ️ Tentang"],
                        label_visibility="collapsed")
     st.divider()
@@ -110,7 +116,10 @@ with st.sidebar:
     st.divider()
     st.markdown("**Status sistem**")
     st.markdown(f"{'🟢' if ENGINE else '🔴'} Database: {'terhubung' if ENGINE else 'tidak terhubung'}")
-    st.markdown(f"{'🟢' if BOT.llm_tersedia else '⚪'} Gemini: {GEMINI_MODEL if BOT.llm_tersedia else 'nonaktif'}")
+    st.markdown(f"{'🟢' if BOT.llm_tersedia else '⚪'} Gemini: {BOT.model if BOT.llm_tersedia else 'nonaktif'}")
+    if BOT.llm_tersedia and getattr(BOT, "error_terakhir", None):
+        with st.expander("Detail error Gemini"):
+            st.code(db.sensor(BOT.error_terakhir)[:400])
     st.markdown(f"📄 Basis pengetahuan: {len(BOT.dokumen)} dokumen ({SUMBER_KB})")
     if DB_ERROR and DATABASE_URL:
         with st.expander("Detail error database"):
@@ -125,7 +134,8 @@ with st.sidebar:
 # ------------------------------------------------------------------ halaman
 def hero():
     st.markdown(f"""<div class="hero"><h2>{INFO_MATERI['judul']}</h2>
-    <p>{INFO_MATERI['subjudul']}</p></div>""", unsafe_allow_html=True)
+    <p>{INFO_MATERI['subjudul']}</p>
+    <div class="author">Disusun oleh: <b>{NAMA_MAHASISWA}</b> · {IDENTITAS}</div></div>""", unsafe_allow_html=True)
 
 
 def tampil_pesan(i, m):
@@ -253,7 +263,7 @@ else:
       U -> S -> R; R -> G [label="konteks"]; G -> S [label="jawaban"]; S -> D [label="log & feedback"];
       D -> R [label="knowledge base"]; }
     """)
-    st.markdown("""
+    st.markdown(f"""
 **Cara kerja**
 1. Pertanyaan pengguna dinormalisasi (huruf kecil, buang tanda baca & stopword, samakan sinonim).
 2. **Retriever** mengukur kemiripan pertanyaan dengan 17 dokumen materi memakai *TF-IDF* kata
@@ -262,6 +272,8 @@ else:
 4. Mode **Gemini (RAG)**: dokumen teratas dikirim sebagai konteks ke Gemini agar jawaban natural
    tetapi tetap berpijak pada materi. Mode **Retrieval**: isi dokumen ditampilkan langsung.
 5. Setiap percakapan & 👍/👎 disimpan ke **PostgreSQL cloud** (Supabase/Neon) untuk dashboard.
+
+**Disusun oleh:** {NAMA_MAHASISWA} — {IDENTITAS}
 
 **Teknologi:** Python · Streamlit · scikit-learn · SQLAlchemy · PostgreSQL (Supabase/Neon) · Google Gemini API
 """)

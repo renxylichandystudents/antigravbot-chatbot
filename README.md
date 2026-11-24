@@ -1,5 +1,10 @@
 # 🚀 AntiGravBot — Chatbot Materi Google Antigravity 2.0
 
+**RENXY LICHANDY**  
+Mahasiswa | 261012000110
+
+🔗 Aplikasi: https://antigravbot.streamlit.app
+
 Chatbot tugas kuliah untuk menjawab pertanyaan seputar materi
 **"Google Antigravity 2.0: Era Baru Rekayasa Perangkat Lunak Berbasis Agen AI"**.
 
@@ -54,7 +59,7 @@ berjalan dalam mode **Retrieval**.
    ```toml
    DATABASE_URL = "postgresql://...connection string Anda..."
    GEMINI_API_KEY = "AIza..."
-   GEMINI_MODEL = "gemini-2.5-flash"
+   GEMINI_MODEL = "gemini-flash-latest"
    ADMIN_PASSWORD = "password-dashboard-anda"
    ```
 4. **Deploy** → Anda mendapat URL publik `https://nama-app.streamlit.app` untuk dibagikan ke

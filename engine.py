@@ -79,7 +79,7 @@ SYSTEM_PROMPT = (
 
 
 class ChatbotAntigravity:
-    def __init__(self, dokumen, api_key=None, model="gemini-2.5-flash", ambang=0.12):
+    def __init__(self, dokumen, api_key=None, model="gemini-flash-latest", ambang=0.12):
         self.dokumen = list(dokumen)
         self.ambang = ambang
         self.model = model
@@ -160,14 +160,27 @@ class ChatbotAntigravity:
             f"RIWAYAT PERCAKAPAN:\n{histori or '-'}\n\n"
             f"PERTANYAAN MAHASISWA: {pertanyaan}"
         )
-        resp = self._gemini().models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, temperature=0.3),
-        )
-        if not resp.text:
-            raise RuntimeError("Respons Gemini kosong")
-        return resp.text.strip()
+        # Coba model yang diatur, lalu alias "latest" dari Google bila model lama sudah dihentikan.
+        kandidat = list(dict.fromkeys([self.model, "gemini-flash-latest", "gemini-flash-lite-latest"]))
+        error = None
+        for nama in kandidat:
+            try:
+                resp = self._gemini().models.generate_content(
+                    model=nama,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, temperature=0.3),
+                )
+                if resp.text:
+                    self.model = nama          # ingat model yang berhasil
+                    return resp.text.strip()
+                error = RuntimeError("Respons Gemini kosong")
+            except Exception as e:
+                error = e
+                pesan = str(e).lower()
+                # Hanya pindah model jika model tidak ditemukan / tidak diizinkan; error lain langsung dilempar
+                if not any(k in pesan for k in ("not found", "404", "not supported", "permission", "403")):
+                    raise
+        raise error
 
     # ------------------------------------------------------------ evaluasi
     def evaluasi(self, data_uji):
