@@ -9,6 +9,7 @@ Tabel:
 """
 
 import json
+import re
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -48,7 +49,11 @@ CREATE INDEX IF NOT EXISTS idx_chat_logs_created ON chat_logs (created_at DESC);
 
 
 def buat_engine(database_url: str):
-    url = database_url.strip()
+    url = str(database_url).strip()
+    # Ambil hanya bagian postgresql://... (abaikan "psql '...'", tanda kutip, spasi, dll.)
+    m = re.search(r"postgres(?:ql)?(?:\+\w+)?://[^\s'\"]+", url)
+    if m:
+        url = m.group(0)
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://"):]
     if url.startswith("postgresql://"):
@@ -116,3 +121,9 @@ def ambil_log(engine, limit: int = 500) -> pd.DataFrame:
                                ORDER BY created_at DESC LIMIT 1) f ON TRUE
             ORDER BY c.created_at DESC LIMIT :n
         """), conn, params={"n": limit})
+
+
+def sensor(teks: str) -> str:
+    """Sembunyikan user/password di pesan error agar tidak tampil di aplikasi publik."""
+    teks = re.sub(r"(postgres(?:ql)?(?:\+\w+)?://)[^@\s'\"]+@", r"\1***:***@", str(teks))
+    return re.sub(r"password=\S+", "password=***", teks)

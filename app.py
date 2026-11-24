@@ -66,7 +66,7 @@ def get_engine():
     try:
         return _engine_tersambung(DATABASE_URL), None
     except Exception as e:
-        return None, str(e)
+        return None, db.sensor(e)
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -114,7 +114,7 @@ with st.sidebar:
     st.markdown(f"📄 Basis pengetahuan: {len(BOT.dokumen)} dokumen ({SUMBER_KB})")
     if DB_ERROR and DATABASE_URL:
         with st.expander("Detail error database"):
-            st.code(DB_ERROR[:600])
+            st.code(DB_ERROR[:400])
     st.divider()
     if st.button("🧹 Mulai percakapan baru", width="stretch"):
         st.session_state.pesan = []
