@@ -52,20 +52,25 @@ ADMIN_PASSWORD = rahasia("ADMIN_PASSWORD", "admin123")
 
 
 @st.cache_resource(show_spinner="Menghubungkan ke database…")
+def _engine_tersambung(url):
+    # Error tidak di-cache (exception dilempar), jadi koneksi dicoba ulang di run berikutnya.
+    eng = db.buat_engine(url)
+    db.init_db(eng)
+    db.seed_kb(eng, DOKUMEN)
+    return eng
+
+
 def get_engine():
     if not DATABASE_URL:
         return None, "DATABASE_URL belum diisi"
     try:
-        eng = db.buat_engine(DATABASE_URL)
-        db.init_db(eng)
-        db.seed_kb(eng, DOKUMEN)
-        return eng, None
+        return _engine_tersambung(DATABASE_URL), None
     except Exception as e:
         return None, str(e)
 
 
 @st.cache_data(ttl=600, show_spinner=False)
-def muat_dokumen():
+def muat_dokumen(url):
     eng, _ = get_engine()
     if eng is not None:
         try:
@@ -78,13 +83,13 @@ def muat_dokumen():
 
 
 @st.cache_resource(show_spinner=False)
-def get_bot(docs_json: str):
-    return ChatbotAntigravity(json.loads(docs_json), api_key=GEMINI_API_KEY, model=GEMINI_MODEL)
+def get_bot(docs_json: str, api_key, model):
+    return ChatbotAntigravity(json.loads(docs_json), api_key=api_key, model=model)
 
 
 ENGINE, DB_ERROR = get_engine()
-DOCS_JSON, SUMBER_KB = muat_dokumen()
-BOT = get_bot(DOCS_JSON)
+DOCS_JSON, SUMBER_KB = muat_dokumen(DATABASE_URL or "")
+BOT = get_bot(DOCS_JSON, GEMINI_API_KEY, GEMINI_MODEL)
 
 if "session_id" not in st.session_state:
     st.session_state.session_id = uuid.uuid4().hex[:12]
