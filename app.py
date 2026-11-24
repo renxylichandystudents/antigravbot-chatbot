@@ -119,7 +119,7 @@ with st.sidebar:
     st.markdown(f"{'🟢' if BOT.llm_tersedia else '⚪'} Gemini: {BOT.model if BOT.llm_tersedia else 'nonaktif'}")
     if BOT.llm_tersedia and getattr(BOT, "error_terakhir", None):
         with st.expander("Detail error Gemini"):
-            st.code(db.sensor(BOT.error_terakhir)[:400])
+            st.caption(db.sensor(BOT.error_terakhir)[:900])
     st.markdown(f"📄 Basis pengetahuan: {len(BOT.dokumen)} dokumen ({SUMBER_KB})")
     if DB_ERROR and DATABASE_URL:
         with st.expander("Detail error database"):

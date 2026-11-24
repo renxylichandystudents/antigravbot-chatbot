@@ -101,11 +101,18 @@ class ChatbotAntigravity:
     def llm_tersedia(self) -> bool:
         return bool(self.api_key)
 
-    def _gemini(self):
-        if self._client is None:
-            from google import genai  # pip install google-genai
-            self._client = genai.Client(api_key=self.api_key)
-        return self._client
+    def _gemini(self, api_version=None):
+        from google import genai  # pip install google-genai
+        if not hasattr(self, "_klien"):
+            self._klien = {}
+        if api_version not in self._klien:
+            if api_version:
+                from google.genai import types
+                self._klien[api_version] = genai.Client(
+                    api_key=self.api_key, http_options=types.HttpOptions(api_version=api_version))
+            else:
+                self._klien[api_version] = genai.Client(api_key=self.api_key)
+        return self._klien[api_version]
 
     # ------------------------------------------------------------ retrieval
     def cari(self, pertanyaan: str, k: int = 3):
@@ -160,27 +167,58 @@ class ChatbotAntigravity:
             f"RIWAYAT PERCAKAPAN:\n{histori or '-'}\n\n"
             f"PERTANYAAN MAHASISWA: {pertanyaan}"
         )
-        # Coba model yang diatur, lalu alias "latest" dari Google bila model lama sudah dihentikan.
-        kandidat = list(dict.fromkeys([self.model, "gemini-flash-latest", "gemini-flash-lite-latest"]))
-        error = None
-        for nama in kandidat:
+        # Urutan percobaan: versi API bawaan lalu v1beta; untuk tiap versi: model dari Secrets,
+        # lalu model Flash yang benar-benar tersedia untuk API key ini.
+        if getattr(self, "_rute_ok", None):
+            rute = [self._rute_ok]
+        else:
+            rute = []
+        dicoba, error = [], None
+        for versi in (None, "v1beta"):
+            nama_list = [self.model]
             try:
-                resp = self._gemini().models.generate_content(
+                nama_list += [m for m in self._model_tersedia(versi) if m != self.model][:4]
+            except Exception as e:
+                dicoba.append(f"list({versi or 'default'}): {str(e)[:80]}")
+            rute += [(versi, n) for n in nama_list]
+        for versi, nama in list(dict.fromkeys(rute)):
+            try:
+                resp = self._gemini(versi).models.generate_content(
                     model=nama,
                     contents=prompt,
                     config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, temperature=0.3),
                 )
                 if resp.text:
-                    self.model = nama          # ingat model yang berhasil
+                    self.model, self._rute_ok, self.error_terakhir = nama, (versi, nama), None
                     return resp.text.strip()
                 error = RuntimeError("Respons Gemini kosong")
+                dicoba.append(f"{nama}@{versi or 'default'}: kosong")
             except Exception as e:
                 error = e
+                dicoba.append(f"{nama}@{versi or 'default'}: {str(e)[:60]}")
                 pesan = str(e).lower()
-                # Hanya pindah model jika model tidak ditemukan / tidak diizinkan; error lain langsung dilempar
-                if not any(k in pesan for k in ("not found", "404", "not supported", "permission", "403")):
-                    raise
-        raise error
+                if not any(k in pesan for k in ("not found", "404", "not supported")):
+                    break
+        raise RuntimeError("Gemini gagal. Percobaan → " + " | ".join(dicoba)) from error
+
+    def _model_tersedia(self, api_version=None):
+        """Daftar model Flash teks yang tersedia untuk API key ini, terbaik lebih dulu."""
+        nama_model = []
+        for m in self._gemini(api_version).models.list():
+            nama = m.name.split("/")[-1]
+            aksi = getattr(m, "supported_actions", None) or []
+            if aksi and "generateContent" not in aksi:
+                continue
+            if "flash" not in nama or any(x in nama for x in (
+                    "image", "tts", "live", "audio", "embedding", "exp", "computer", "transcribe")):
+                continue
+            nama_model.append(nama)
+
+        def kunci(n):
+            versi = re.findall(r"(\d+(?:\.\d+)?)", n)
+            return ("preview" not in n, "lite" not in n, float(versi[0]) if versi else 0.0)
+
+        return sorted(set(nama_model), key=kunci, reverse=True)
 
     # ------------------------------------------------------------ evaluasi
     def evaluasi(self, data_uji):
